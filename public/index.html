@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ariadne — фотоархів</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <h1>Ariadne</h1>
+      <p class="subtitle">Організація домашнього фотоархіву</p>
+    </header>
+
+    <nav class="mode-tabs" role="tablist">
+      <button type="button" id="mode-duplicates" class="mode-tab active" role="tab" aria-selected="true">Дублікати</button>
+      <button type="button" id="mode-cleanup" class="mode-tab" role="tab" aria-selected="false">Видалення</button>
+      <button type="button" id="mode-timeline" class="mode-tab" role="tab" aria-selected="false">Час і місце</button>
+      <button type="button" id="mode-batches" class="mode-tab" role="tab" aria-selected="false">Батчі</button>
+    </nav>
+
+    <!-- Step 1: scan -->
+    <section id="scan-screen" class="screen active">
+      <form id="scan-form" class="scan-form">
+        <label for="path-input">Шлях до папки на сервері</label>
+        <div class="path-row">
+          <div class="path-input-wrap">
+            <input
+              id="path-input"
+              type="text"
+              placeholder="/home/user/Pictures"
+              autocomplete="off"
+              required
+            >
+            <ul id="path-suggestions" class="path-suggestions hidden" role="listbox"></ul>
+          </div>
+          <button type="button" id="pick-folder-btn" class="path-browse-btn" title="Обрати папку">Обрати…</button>
+          <button type="submit" id="scan-btn">Сканувати</button>
+        </div>
+        <p class="hint" id="scan-hint">Введіть абсолютний шлях або оберіть папку через системний діалог (якщо браузер і сервер на одній машині).</p>
+      </form>
+
+      <div id="scan-idle" class="empty-state empty-state-idle">
+        <div class="empty-state-icon" aria-hidden="true">◎</div>
+        <h3 id="scan-idle-title" class="empty-state-title"></h3>
+        <p id="scan-idle-message" class="empty-state-message"></p>
+      </div>
+
+      <div id="progress" class="progress hidden">
+        <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+        <p id="progress-text" class="progress-text">Сканування…</p>
+        <button type="button" id="btn-cancel-scan" class="text-btn progress-cancel hidden">Скасувати</button>
+      </div>
+
+      <div id="scan-result" class="empty-state empty-state-result hidden">
+        <div id="scan-result-icon" class="empty-state-icon" aria-hidden="true">✓</div>
+        <h3 id="scan-result-title" class="empty-state-title"></h3>
+        <p id="scan-result-message" class="empty-state-message"></p>
+        <p id="scan-result-path" class="empty-state-path"></p>
+        <button type="button" id="btn-scan-again" class="text-btn empty-state-action">Обрати іншу папку</button>
+      </div>
+
+      <div id="timeline-results" class="timeline-results hidden">
+        <div class="timeline-summary">
+          <div class="timeline-stat">
+            <span class="timeline-stat-label">Від</span>
+            <span id="timeline-min" class="timeline-stat-value">—</span>
+          </div>
+          <div class="timeline-stat">
+            <span class="timeline-stat-label">До</span>
+            <span id="timeline-max" class="timeline-stat-value">—</span>
+          </div>
+          <div class="timeline-stat">
+            <span class="timeline-stat-label">Фото</span>
+            <span id="timeline-total" class="timeline-stat-value">—</span>
+          </div>
+        </div>
+        <p id="timeline-meta" class="timeline-meta"></p>
+        <div class="timeline-chart-wrap">
+          <div id="timeline-chart" class="timeline-chart" role="img" aria-label="Гістограма фото за часом"></div>
+        </div>
+
+        <div id="timeline-bucket-section" class="timeline-bucket-section hidden">
+          <h3 id="timeline-bucket-title" class="timeline-section-title"></h3>
+          <div id="timeline-bucket-grid" class="timeline-bucket-grid"></div>
+        </div>
+
+        <div id="timeline-map-section" class="timeline-map-section hidden">
+          <h3 class="timeline-section-title">Місця зйомки</h3>
+          <p id="timeline-geo-meta" class="timeline-meta"></p>
+          <div id="timeline-map" class="timeline-map" role="img" aria-label="Теплова карта місць зйомки"></div>
+        </div>
+      </div>
+
+      <div id="batches-panel" class="batches-panel hidden">
+        <div id="batches-list" class="batches-list">
+          <p class="hint">Завантаження…</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Step 2: review -->
+    <section id="review-screen" class="screen">
+      <div class="review-header">
+        <button type="button" id="btn-review-exit" class="text-btn">← Вийти</button>
+        <span id="counter" class="counter">1 / 1</span>
+        <button type="button" id="btn-save" class="text-btn">Зберегти</button>
+      </div>
+      <p id="scan-path" class="scan-path-full"></p>
+
+      <div class="card-stack" id="card-stack">
+        <div id="card" class="card">
+          <div class="card-label">Група дублів</div>
+          <div id="card-images" class="card-images"></div>
+          <p class="card-hint">Клік або ← → — обрати фото · Enter — підтвердити</p>
+          <p id="prediction-hint" class="prediction-hint hidden"></p>
+          <div id="card-paths" class="card-paths"></div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="button" id="btn-no" class="action-btn no" title="Не дублікати — залишити всі">
+          <span class="action-icon">✕</span>
+          <span>Ні</span>
+        </button>
+        <button type="button" id="btn-yes" class="action-btn yes" title="Дублікати — видалити зайві">
+          <span class="action-icon">♥</span>
+          <span>Так</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Cleanup review -->
+    <section id="cleanup-review-screen" class="screen">
+      <div class="review-header">
+        <button type="button" id="btn-cleanup-exit" class="text-btn">← Вийти</button>
+        <span id="cleanup-counter" class="counter">1 / 1</span>
+        <div class="review-mode-tabs" role="tablist">
+          <button type="button" id="cleanup-mode-tinder" class="review-mode-tab active" role="tab">Картки</button>
+          <button type="button" id="cleanup-mode-grid" class="review-mode-tab" role="tab">Плитки</button>
+        </div>
+        <button type="button" id="btn-cleanup-save" class="text-btn">Зберегти</button>
+      </div>
+      <p id="cleanup-scan-path" class="scan-path-full"></p>
+
+      <div id="cleanup-tinder-view">
+        <div class="card-stack" id="cleanup-card-stack">
+          <div id="cleanup-card" class="card cleanup-card">
+            <div class="card-label">Фото</div>
+            <div id="cleanup-card-image" class="cleanup-card-image"></div>
+            <p class="card-hint">← залишити · → видалити · Enter — підтвердити</p>
+            <div id="cleanup-card-path" class="card-paths"></div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button type="button" id="btn-cleanup-no" class="action-btn no" title="Залишити">
+            <span class="action-icon">✕</span>
+            <span>Залишити</span>
+          </button>
+          <button type="button" id="btn-cleanup-yes" class="action-btn yes" title="Видалити">
+            <span class="action-icon">🗑</span>
+            <span>Видалити</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="cleanup-grid-view" class="hidden">
+        <div class="grid-controls">
+          <label class="tile-size-control">
+            <span>Розмір плитки</span>
+            <input type="range" id="tile-size-slider" min="60" max="240" value="120">
+          </label>
+          <span id="cleanup-selected-count" class="selected-count">0 обрано</span>
+          <div class="grid-bulk-actions">
+            <button type="button" id="btn-select-all" class="text-btn">Обрати всі</button>
+            <button type="button" id="btn-deselect-all" class="text-btn">Зняти всі</button>
+          </div>
+        </div>
+        <div id="cleanup-grid" class="cleanup-grid"></div>
+        <button type="button" id="btn-cleanup-grid-save" class="primary-btn grid-save-btn">Зберегти батч</button>
+      </div>
+    </section>
+
+    <!-- Cleanup done -->
+    <section id="cleanup-done-screen" class="screen">
+      <div class="done-card">
+        <div class="done-icon">✓</div>
+        <h2>Готово!</h2>
+        <p id="cleanup-done-summary"></p>
+        <p id="cleanup-done-file" class="done-file"></p>
+        <button type="button" id="btn-cleanup-restart" class="primary-btn">На головну</button>
+      </div>
+    </section>
+
+    <!-- Step 3: done (duplicates) -->
+    <section id="done-screen" class="screen">
+      <div class="done-card">
+        <div class="done-icon">✓</div>
+        <h2>Готово!</h2>
+        <p id="done-summary"></p>
+        <p id="done-file" class="done-file"></p>
+        <button type="button" id="btn-restart" class="primary-btn">На головну</button>
+      </div>
+    </section>
+
+    <!-- Batch detail -->
+    <section id="batch-screen" class="screen">
+      <div class="batch-header">
+        <button type="button" id="btn-batch-back" class="text-btn">← Назад</button>
+        <h2 id="batch-title" class="batch-title">Батч</h2>
+      </div>
+      <div id="batch-meta" class="batch-meta"></div>
+      <div id="batch-delete-list" class="batch-delete-list"></div>
+      <div class="batch-actions">
+        <button type="button" id="btn-delete-batch" class="text-btn danger-btn">Видалити батч</button>
+        <button type="button" id="btn-execute" class="execute-btn">Execute — видалити файли</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="prediction-modal" class="prediction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="prediction-modal-title">
+    <div class="prediction-modal-backdrop" id="prediction-modal-backdrop"></div>
+    <div class="prediction-modal-card">
+      <div class="prediction-modal-icon">✦</div>
+      <h3 id="prediction-modal-title" class="prediction-modal-title">Передбачення за аналогією</h3>
+      <p id="prediction-modal-message" class="prediction-modal-message"></p>
+      <p id="prediction-modal-detail" class="prediction-modal-detail"></p>
+      <div class="prediction-modal-actions">
+        <button type="button" id="btn-prediction-dismiss" class="action-btn no" title="Пізніше">
+          <span class="action-icon">✕</span>
+          <span>Пізніше</span>
+        </button>
+        <button type="button" id="btn-prediction-apply" class="action-btn yes" title="Застосувати передбачення">
+          <span class="action-icon">♥</span>
+          <span>Застосувати</span>
+        </button>
+      </div>
+      <p class="prediction-modal-hint">← пізніше · → застосувати · Enter — підтвердити</p>
+    </div>
+  </div>
+
+  <div id="confirm-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-backdrop" id="modal-backdrop"></div>
+    <div class="modal-card">
+      <h3 id="modal-title" class="modal-title"></h3>
+      <p id="modal-message" class="modal-message"></p>
+      <div id="modal-actions" class="modal-actions"></div>
+    </div>
+  </div>
+
+  <script src="/app.js" type="module"></script>
+</body>
+</html>
